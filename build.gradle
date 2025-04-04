@@ -1,0 +1,79 @@
+plugins {
+	id 'java'
+	id 'war'
+	id 'org.springframework.boot' version '3.4.4'
+	id 'io.spring.dependency-management' version '1.1.7'
+}
+
+group = 'com.darkdragon'
+version = '0.0.1-SNAPSHOT'
+
+java {
+	toolchain {
+		languageVersion = JavaLanguageVersion.of(21)
+	}
+}
+
+repositories {
+	mavenCentral()
+}
+
+dependencies {
+	implementation 'org.springframework.boot:spring-boot-starter-web'
+	providedRuntime 'org.springframework.boot:spring-boot-starter-tomcat'
+	testImplementation 'org.springframework.boot:spring-boot-starter-test'
+	testRuntimeOnly 'org.junit.platform:junit-platform-launcher'
+}
+
+tasks.named('test') {
+	useJUnitPlatform()
+}
+
+// 리액트 빌드 시 자동으로 Spring boot의 static 폴더에 복사 및 배포
+def frontendDir = "$projectDir/src/main/frontend"
+
+sourceSets {
+	main {
+		resources {
+			srcDirs = ["$projectDir/src/main/resources"]
+		}
+	}
+}
+
+task installReact(type: Exec) {
+	workingDir frontendDir
+	inputs.dir frontendDir
+	group = BasePlugin.BUILD_GROUP
+
+	if (System.getProperty('os.name').toLowerCase(Locale.ROOT).contains('windows')) {
+		commandLine "npm.cmd", "install"
+		commandLine "npm.cmd", "audit", "fix"
+	} else {
+		commandLine "npm", "install"
+		commandLine "npm", "audit", "fix"
+	}
+}
+
+task buildReact(type: Exec) {
+	dependsOn installReact
+	workingDir frontendDir
+	inputs.dir frontendDir
+	group = BasePlugin.BUILD_GROUP
+
+	if (System.getProperty('os.name').toLowerCase(Locale.ROOT).contains('windows')) {
+		commandLine "npm.cmd", "run", "build"
+	} else {
+		commandLine "npm", "run", "build"
+	}
+}
+
+task copyReactBuildFiles(type: Copy) {
+	dependsOn buildReact
+	from "$frontendDir/dist" // Vite 사용 시
+	// from "$frontendDir/build" // CRA(Create React App) 사용 시
+	into "$projectDir/src/main/resources/static"
+}
+
+processResources {
+	dependsOn copyReactBuildFiles
+}
